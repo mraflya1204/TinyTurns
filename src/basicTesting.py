@@ -41,7 +41,7 @@ def get_player_action(player_name):
     print("Choose your action:")
     print("0: Skip Turn (Costs 0 SP)")
     print("1: Basic Attack (Costs 0 SP)")
-    print("2: Heavy Attack (Costs 5 SP, +50% DMG Dealt)")
+    print("2: Heavy Attack (Costs 5 SP)")
     print("3: Debuff Enemy (Costs 3 SP, apply 30% Vulnerability & 20% DEF Down)")
     print("4: Heal (Costs 4 SP, Heals 500,000 HP)")
     print("5: Super Buff (Costs 7 SP, +25% CRIT Rate & +100% CRIT DMG)")
@@ -93,13 +93,14 @@ def main():
             print(f"{attacker_name} skips the turn!")
         elif action == '1': # Basic Attack
             print(f"{attacker_name} performs a Basic Attack!")
-            defender.takeDMG(attacker, 200000)
+            DMGDealt = defender.takeDMG(attacker, 200000)
+            print(f"*** {defender_name} took {DMGDealt:,} damage! ***")
         elif action == '2': # Heavy Attack
             if attacker.SP >= 5:
                 attacker.SP -= 5
-                attacker.DMGDealt += 0.5
                 print(f"{attacker_name} uses a Heavy Attack!")
-                defender.takeDMG(attacker, 300000)
+                DMGDealt = defender.takeDMG(attacker, 400000)
+                print(f"*** {defender_name} took {DMGDealt:,} damage! ***")
             else:
                 print("Not enough SP for a Heavy Attack! Turn skipped.")
         elif action == '3': # Debuff
@@ -122,6 +123,7 @@ def main():
                 attacker.SP -= 7
                 attacker.CRITRate += 0.25
                 attacker.CRITDMG += 1.0
+                attacker.DMGDealt += 0.25
                 print(f"{attacker_name} uses Super Buff!")
             else:
                 print("Not enough SP for Super Buff! Turn skipped.")
