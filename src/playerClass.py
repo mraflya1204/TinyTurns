@@ -21,7 +21,7 @@ class Player:
     def takeDMG(self, attacker, baseDMG):
         #CRIT Check
         calcCRIT: bool
-        if random.randrange(0, 1) <= attacker.CRITRate:
+        if random.random() <= attacker.CRITRate:
             calcCRIT = True
         else:
             calcCRIT = False
@@ -29,10 +29,10 @@ class Player:
         #Don't mind the long formula, I prefer this so less variable
         #If CRIT
         if calcCRIT:
-            DMGTaken: int = baseDMG * (1 + attacker.DMGDealt) * (1 + attacker.CRITDMG) * (1 + self.vulnerability) * (1 - self.DEF/(self.DEF+1000)) * random.randrange(0.9, 1.1)
+            DMGTaken: int = baseDMG * (1 + attacker.DMGDealt) * (1 + attacker.CRITDMG) * (1 + self.vulnerability) * (1 - self.DEF/(self.DEF+1000)) * random.uniform(0.9, 1.1)
         #Not CRIT
         else:
-            DMGTaken: int = baseDMG * (1 + attacker.DMGDealt) * (1 + self.vulnerability) * (1 - self.DEF/(self.DEF+1000)) * random.randrange(0.9, 1.1)
+            DMGTaken: int = baseDMG * (1 + attacker.DMGDealt) * (1 + self.vulnerability) * (1 - self.DEF/(self.DEF+1000)) * random.uniform(0.9, 1.1)
 
         #DMG Calc done, apply to self
         self.currHP -= DMGTaken
