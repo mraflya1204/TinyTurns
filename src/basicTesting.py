@@ -1,0 +1,137 @@
+"""
+The following is AI-Generated with the following prompt
+
+The following file is the main class, playerClass.py for our project TinyTurns.
+It is a simple PvP Turn-Based Game that utilizes TCP, pygame, and uses pickle to send the Class data so Client can update it.
+
+For now, please generate a testing ground that not yet utilize any networking, and just run in local instance and in a single terminal.
+
+In addition, I added the Command 0 to Skip Turn so player can opt not to use their buff/debuff
+
+This results in a nuke setup where you can spam buff/debuff to oneshot the enemy, but that's fun
+"""
+
+import pygame
+from playerClass import Player
+import time
+
+# Simple text-based interface functions
+def print_player_stats(player, player_name):
+    """Prints the current stats of a player."""
+    print(f"\n--- {player_name}'s Stats ---")
+    print(f"HP: {int(player.currHP)} / {player.maxHP}")
+    print(f"SP: {player.SP} / 20")
+    print(f"CRIT Rate: {player.CRITRate:.2%}")
+    print(f"CRIT DMG: {player.CRITDMG:.2%}")
+    print(f"Damage Dealt Buff: {player.DMGDealt:.2%}")
+    print(f"Vulnerability Debuff: {player.vulnerability:.2%}")
+    print(f"DEF: {player.DEF}")
+    print("--------------------")
+
+def get_player_action(player_name):
+    """Gets the action choice from the current player."""
+    print(f"\n{player_name}'s Turn!")
+    print("Choose your action:")
+    print("0: Skip Turn (Costs 0 SP)")
+    print("1: Basic Attack (Costs 0 SP)")
+    print("2: Heavy Attack (Costs 5 SP, +50% DMG Dealt)")
+    print("3: Debuff Enemy (Costs 3 SP, apply 30% Vulnerability & 20% DEF Down)")
+    print("4: Heal (Costs 4 SP, Heals 500,000 HP)")
+    print("5: Super Buff (Costs 7 SP, +25% CRIT Rate & +100% CRIT DMG)")
+
+    while True:
+        choice = input("Enter your choice (0-5): ")
+        if choice in ['0', '1', '2', '3', '4', '5']:
+            return choice
+        print("Invalid input. Please enter a number between 0 and 5.")
+
+def main():
+    """Main function to run the game simulation."""
+    # Initialize Pygame for potential future use (and random number generation)
+    pygame.init()
+
+    # Create two player instances
+    player1 = Player()
+    player2 = Player()
+
+    current_turn = 1
+    game_over = False
+
+    # Main game loop
+    while not game_over:
+        # Determine whose turn it is
+        if current_turn % 2 != 0:
+            attacker = player1
+            defender = player2
+            attacker_name = "Player 1"
+            defender_name = "Player 2"
+        else:
+            attacker = player2
+            defender = player1
+            attacker_name = "Player 2"
+            defender_name = "Player 1"
+
+        # Start of turn actions
+        attacker.turnStart()
+
+        # Display stats
+        print_player_stats(player1, "Player 1")
+        print_player_stats(player2, "Player 2")
+
+        # Get player action
+        action = get_player_action(attacker_name)
+
+        # Execute action
+        if action == '0': #Skip Turn
+            print(f"{attacker_name} skips the turn!")
+        elif action == '1': # Basic Attack
+            print(f"{attacker_name} performs a Basic Attack!")
+            defender.takeDMG(attacker, 200000)
+        elif action == '2': # Heavy Attack
+            if attacker.SP >= 5:
+                attacker.SP -= 5
+                attacker.DMGDealt += 0.5
+                print(f"{attacker_name} uses a Heavy Attack!")
+                defender.takeDMG(attacker, 300000)
+            else:
+                print("Not enough SP for a Heavy Attack! Turn skipped.")
+        elif action == '3': # Debuff
+            if attacker.SP >= 3:
+                attacker.SP -= 3
+                defender.applyVulnerability(0.30)
+                defender.applyDEFDown(0.20)
+                print(f"{attacker_name} debuffs {defender_name}!")
+            else:
+                print("Not enough SP for a Debuff! Turn skipped.")
+        elif action == '4': # Heal
+            if attacker.SP >= 4:
+                attacker.SP -= 4
+                attacker.heal(500000)
+                print(f"{attacker_name} heals!")
+            else:
+                print("Not enough SP to Heal! Turn skipped.")
+        elif action == '5': # Super Buff
+            if attacker.SP >= 7:
+                attacker.SP -= 7
+                attacker.CRITRate += 0.25
+                attacker.CRITDMG += 1.0
+                print(f"{attacker_name} uses Super Buff!")
+            else:
+                print("Not enough SP for Super Buff! Turn skipped.")
+
+        # Check for game over condition
+        if player1.currHP <= 0:
+            print("\nPlayer 2 wins!")
+            game_over = True
+        elif player2.currHP <= 0:
+            print("\nPlayer 1 wins!")
+            game_over = True
+
+        # Move to the next turn
+        current_turn += 1
+        time.sleep(1) # Pause for a moment to make the turn flow readable
+
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()
