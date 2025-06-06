@@ -46,6 +46,9 @@ class Player:
         self.vulnerability = 0.0
         self.DEF = 1100
 
+        #So I can see the DMG Number
+        return int(DMGTaken)
+
     #Call this at the start of player turn
     def turnStart(self):
         self.SP += 3 #Gain 3 SP per turn
