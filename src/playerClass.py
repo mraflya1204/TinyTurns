@@ -15,7 +15,6 @@ class Player:
         self.DMGDealt: float = 0.0 #0% starting DMG Dealt Multiplier
 
         #Debuff
-        self.poison: bool = False #Start not poisoned
         self.vulnerability: float = 0.0 #0% Starting Vulnerability Multiplier
 
     #Called by the receiving attack's player, honestly doesn't matter since we have both player in parameter anyways
@@ -38,6 +37,38 @@ class Player:
         #DMG Calc done, apply to self
         self.currHP -= DMGTaken
 
-        #If got poison
-        if self.poison:
-            self.currHP -= 0.1 * self.maxHP
+        #Remove buffs from Attacker after attacking
+        attacker.CRITRate = 0.05
+        attacker.CRITDMG = 0.5
+        attacker.DMGDealt = 0.0
+
+        #Remove debuff from self
+        self.vulnerability = 0.0
+        self.DEF = 1100
+
+    #Call this at the start of player turn
+    def turnStart(self):
+        self.SP += 3 #Gain 3 SP per turn
+
+        #Max SP is 20
+        if self.SP >= 20:
+            self.SP = 20
+
+    #If use healing
+    def heal(self, baseDMG):
+        self.currHP += baseDMG
+
+        #Prevent Overheal
+        if self.currHP > self.maxHP:
+            self.currHP = self.maxHP
+
+    #If got Vulnerabiluity
+    def applyVulnerability(self, baseDMG):
+        self.vulnerability += baseDMG
+
+    def applyDEFDown(self, baseDMG):
+        self.DEF -= baseDMG * 1100
+
+        #Prevent Negative (since that would heal if receiving attacks I think? lol)
+        if(self.DEF < 0):
+            self.DEF = 0
