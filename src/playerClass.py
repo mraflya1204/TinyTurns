@@ -59,13 +59,16 @@ class Player:
         if self.SP >= 20:
             self.SP = 20
 
-    #If got Vulnerabiluity
-    def applyVulnerability(self, baseDMG):
-        self.vulnerability += baseDMG
+    #Call for CRIT Buff command
+    def CRITBuff(self):
+        self.CRITRate += 0.5
+        self.CRITDMG += 0.5
 
-    def applyDEFDown(self, baseDMG):
-        self.DEF -= baseDMG * 1100
+    #Call for Enhancement command
+    def enchancement(self):
+        self.DMGDealt += 0.5
+        self.ATK += 0.9 * self.ATK
 
-        #Prevent Negative (since that would heal if receiving attacks I think? lol)
-        if(self.DEF < 0):
-            self.DEF = 0
+    def debuff(self):
+        self.vulnerability += 0.5
+        self.DEF -= 0.5 * 1100

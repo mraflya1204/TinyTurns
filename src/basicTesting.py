@@ -109,8 +109,7 @@ def main():
             elif action == '3': # Debuff
                 if attacker.SP >= 6:
                     attacker.SP -= 6
-                    defender.applyVulnerability(0.50)
-                    defender.applyDEFDown(0.50)
+                    defender.debuff()
                     print(f"{attacker_name} debuffs {defender_name}!")
                     break
                 else:
@@ -118,8 +117,7 @@ def main():
             elif action == '4': # CRIT Buff
                 if attacker.SP >= 6:
                     attacker.SP -= 6
-                    attacker.CRITRate += 0.5
-                    attacker.CRITDMG += 0.5
+                    attacker.CRITBuff()
                     print(f"{attacker_name} uses CRIT Buff!")
                     break
                 else:
@@ -127,8 +125,7 @@ def main():
             elif action == '5': #DMG Buff
                 if attacker.SP >= 6:
                     attacker.SP -= 6
-                    attacker.DMGDealt += 0.5
-                    attacker.ATK += 2700
+                    attacker.enchancement()
                     print(f"{attacker_name} uses Enchancement!")
                     break
                 else:
