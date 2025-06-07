@@ -72,3 +72,5 @@ class Player:
     def debuff(self):
         self.vulnerability += 0.5
         self.DEF -= 0.5 * 1100
+        if self.DEF <= 0:
+            self.DEF = 0
