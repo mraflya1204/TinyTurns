@@ -45,8 +45,8 @@ def get_player_action(player_name):
     print("0: Skip Turn (0 SP)")
     print("1: Basic Attack (0 SP)")
     print("2: Heavy Attack (3 SP)")
-    print("3: Debuff Enemy (6 SP, apply 40% Vulnerability & 40% DEF Down)")
-    print("4: CRIT Buff (6 SP, +70% CRIT Rate & +50% CRIT DMG)")
+    print("3: Debuff Enemy (6 SP, apply 50% Vulnerability & 50% DEF Down)")
+    print("4: CRIT Buff (6 SP, +50% CRIT Rate & +50% CRIT DMG)")
     print("5: Enhancement (6 SP, +90% ATK & +50% DMG)")
 
     while True:
@@ -129,10 +129,10 @@ def main():
                     attacker.SP -= 6
                     attacker.DMGDealt += 0.5
                     attacker.ATK += 2700
-                    print(f"{attacker_name} uses DMG Buff!")
+                    print(f"{attacker_name} uses Enchancement!")
                     break
                 else:
-                    print("Not enough SP for DMG Buff!")
+                    print("Not enough SP for Enhancement!")
 
         # Check for game over condition
         if player1.currHP <= 0:
