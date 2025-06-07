@@ -64,8 +64,6 @@ def main():
     player1 = Player()
     player2 = Player()
 
-    player1.SP = 10000
-
     current_turn = 1
     game_over = False
 
