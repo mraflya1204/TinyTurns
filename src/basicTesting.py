@@ -6,6 +6,8 @@ It is a simple PvP Turn-Based Game that utilizes TCP, pygame, and uses pickle to
 
 For now, please generate a testing ground that not yet utilize any networking, and just run in local instance and in a single terminal.
 
+https://g.co/gemini/share/40f5fcb44eae
+
 """
 
 """
@@ -85,48 +87,53 @@ def main():
         print_player_stats(player1, "Player 1")
         print_player_stats(player2, "Player 2")
 
-        # Get player action
-        action = get_player_action(attacker_name)
-
         # Execute action
-        if action == '0': #Skip Turn
-            print(f"{attacker_name} skips the turn!")
-        elif action == '1': # Basic Attack
-            print(f"{attacker_name} performs a Basic Attack!")
-            DMGDealt = defender.takeDMG(attacker, 200000)
-            print(f"*** {defender_name} took {DMGDealt:,} damage! ***")
-        elif action == '2': # Heavy Attack
-            if attacker.SP >= 5:
-                attacker.SP -= 5
-                print(f"{attacker_name} uses a Heavy Attack!")
-                DMGDealt = defender.takeDMG(attacker, 400000)
+        while True:
+            # Get player action
+            action = get_player_action(attacker_name)
+            if action == '0': #Skip Turn
+                print(f"{attacker_name} skips the turn!")
+            elif action == '1': # Basic Attack
+                print(f"{attacker_name} performs a Basic Attack!")
+                DMGDealt = defender.takeDMG(attacker, 200000)
                 print(f"*** {defender_name} took {DMGDealt:,} damage! ***")
-            else:
-                print("Not enough SP for a Heavy Attack! Turn skipped.")
-        elif action == '3': # Debuff
-            if attacker.SP >= 3:
-                attacker.SP -= 3
-                defender.applyVulnerability(0.30)
-                defender.applyDEFDown(0.20)
-                print(f"{attacker_name} debuffs {defender_name}!")
-            else:
-                print("Not enough SP for a Debuff! Turn skipped.")
-        elif action == '4': # Heal
-            if attacker.SP >= 4:
-                attacker.SP -= 4
-                attacker.heal(500000)
-                print(f"{attacker_name} heals!")
-            else:
-                print("Not enough SP to Heal! Turn skipped.")
-        elif action == '5': # Super Buff
-            if attacker.SP >= 7:
-                attacker.SP -= 7
-                attacker.CRITRate += 0.25
-                attacker.CRITDMG += 1.0
-                attacker.DMGDealt += 0.25
-                print(f"{attacker_name} uses Super Buff!")
-            else:
-                print("Not enough SP for Super Buff! Turn skipped.")
+                break
+            elif action == '2': # Heavy Attack
+                if attacker.SP >= 5:
+                    attacker.SP -= 5
+                    print(f"{attacker_name} uses a Heavy Attack!")
+                    DMGDealt = defender.takeDMG(attacker, 400000)
+                    print(f"*** {defender_name} took {DMGDealt:,} damage! ***")
+                    break
+                else:
+                    print("Not enough SP for a Heavy Attack!")
+            elif action == '3': # Debuff
+                if attacker.SP >= 3:
+                    attacker.SP -= 3
+                    defender.applyVulnerability(0.30)
+                    defender.applyDEFDown(0.20)
+                    print(f"{attacker_name} debuffs {defender_name}!")
+                    break
+                else:
+                    print("Not enough SP for a Debuff!")
+            elif action == '4': # Heal
+                if attacker.SP >= 4:
+                    attacker.SP -= 4
+                    attacker.heal(500000)
+                    print(f"{attacker_name} heals!")
+                    break
+                else:
+                    print("Not enough SP to Heal!")
+            elif action == '5': # Super Buff
+                if attacker.SP >= 7:
+                    attacker.SP -= 7
+                    attacker.CRITRate += 0.25
+                    attacker.CRITDMG += 1.0
+                    attacker.DMGDealt += 0.25
+                    print(f"{attacker_name} uses Super Buff!")
+                    break
+                else:
+                    print("Not enough SP for Super Buff!")
 
         # Check for game over condition
         if player1.currHP <= 0:
