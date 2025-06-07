@@ -30,6 +30,7 @@ def print_player_stats(player, player_name):
     print(f"\n--- {player_name}'s Stats ---")
     print(f"HP: {int(player.currHP)} / {player.maxHP}")
     print(f"SP: {player.SP} / 20")
+    print(f"ATK: {player.ATK}")
     print(f"CRIT Rate: {player.CRITRate:.2%}")
     print(f"CRIT DMG: {player.CRITDMG:.2%}")
     print(f"Damage Dealt Buff: {player.DMGDealt:.2%}")
@@ -41,12 +42,12 @@ def get_player_action(player_name):
     """Gets the action choice from the current player."""
     print(f"\n{player_name}'s Turn!")
     print("Choose your action:")
-    print("0: Skip Turn (Costs 0 SP)")
-    print("1: Basic Attack (Costs 0 SP)")
-    print("2: Heavy Attack (Costs 5 SP)")
-    print("3: Debuff Enemy (Costs 3 SP, apply 30% Vulnerability & 20% DEF Down)")
-    print("4: Heal (Costs 4 SP, Heals 500,000 HP)")
-    print("5: Super Buff (Costs 7 SP, +25% CRIT Rate & +100% CRIT DMG)")
+    print("0: Skip Turn (0 SP)")
+    print("1: Basic Attack (0 SP)")
+    print("2: Heavy Attack (3 SP)")
+    print("3: Debuff Enemy (6 SP, apply 40% Vulnerability & 40% DEF Down)")
+    print("4: CRIT Buff (6 SP, +70% CRIT Rate & +50% CRIT DMG)")
+    print("5: Enhancement (6 SP, +90% ATK & +50% DMG)")
 
     while True:
         choice = input("Enter your choice (0-5): ")
@@ -62,6 +63,8 @@ def main():
     # Create two player instances
     player1 = Player()
     player2 = Player()
+
+    player1.SP = 10000
 
     current_turn = 1
     game_over = False
@@ -93,45 +96,45 @@ def main():
                 break
             elif action == '1': # Basic Attack
                 print(f"{attacker_name} performs a Basic Attack!")
-                DMGDealt = defender.takeDMG(attacker, 200000)
+                DMGDealt = defender.takeDMG(attacker, 50)
                 print(f"*** {defender_name} took {DMGDealt:,} damage! ***")
                 break
             elif action == '2': # Heavy Attack
-                if attacker.SP >= 5:
-                    attacker.SP -= 5
+                if attacker.SP >= 3:
+                    attacker.SP -= 3
                     print(f"{attacker_name} uses a Heavy Attack!")
-                    DMGDealt = defender.takeDMG(attacker, 400000)
+                    DMGDealt = defender.takeDMG(attacker, 75)
                     print(f"*** {defender_name} took {DMGDealt:,} damage! ***")
                     break
                 else:
                     print("Not enough SP for a Heavy Attack!")
             elif action == '3': # Debuff
-                if attacker.SP >= 3:
-                    attacker.SP -= 3
-                    defender.applyVulnerability(0.30)
-                    defender.applyDEFDown(0.20)
+                if attacker.SP >= 6:
+                    attacker.SP -= 6
+                    defender.applyVulnerability(0.50)
+                    defender.applyDEFDown(0.50)
                     print(f"{attacker_name} debuffs {defender_name}!")
                     break
                 else:
                     print("Not enough SP for a Debuff!")
-            elif action == '4': # Heal
-                if attacker.SP >= 4:
-                    attacker.SP -= 4
-                    attacker.heal(500000)
-                    print(f"{attacker_name} heals!")
+            elif action == '4': # CRIT Buff
+                if attacker.SP >= 6:
+                    attacker.SP -= 6
+                    attacker.CRITRate += 0.5
+                    attacker.CRITDMG += 0.5
+                    print(f"{attacker_name} uses CRIT Buff!")
                     break
                 else:
-                    print("Not enough SP to Heal!")
-            elif action == '5': # Super Buff
-                if attacker.SP >= 7:
-                    attacker.SP -= 7
-                    attacker.CRITRate += 0.25
-                    attacker.CRITDMG += 1.0
-                    attacker.DMGDealt += 0.25
-                    print(f"{attacker_name} uses Super Buff!")
+                    print("Not enough SP for CRIT Buff!")
+            elif action == '5': #DMG Buff
+                if attacker.SP >= 6:
+                    attacker.SP -= 6
+                    attacker.DMGDealt += 0.5
+                    attacker.ATK += 2700
+                    print(f"{attacker_name} uses DMG Buff!")
                     break
                 else:
-                    print("Not enough SP for Super Buff!")
+                    print("Not enough SP for DMG Buff!")
 
         # Check for game over condition
         if player1.currHP <= 0:
