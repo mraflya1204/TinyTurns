@@ -80,9 +80,6 @@ def main():
             attacker_name = "Player 2"
             defender_name = "Player 1"
 
-        # Start of turn actions
-        attacker.turnStart()
-
         # Display stats
         print_player_stats(player1, "Player 1")
         print_player_stats(player2, "Player 2")
@@ -93,6 +90,7 @@ def main():
             action = get_player_action(attacker_name)
             if action == '0': #Skip Turn
                 print(f"{attacker_name} skips the turn!")
+                break
             elif action == '1': # Basic Attack
                 print(f"{attacker_name} performs a Basic Attack!")
                 DMGDealt = defender.takeDMG(attacker, 200000)
@@ -144,6 +142,8 @@ def main():
             game_over = True
 
         # Move to the next turn
+        # Start of turn actions
+        attacker.turnEnd()
         current_turn += 1
         time.sleep(1) # Pause for a moment to make the turn flow readable
 

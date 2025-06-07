@@ -50,7 +50,7 @@ class Player:
         return int(DMGTaken)
 
     #Call this at the start of player turn
-    def turnStart(self):
+    def turnEnd(self):
         self.SP += 3 #Gain 3 SP per turn
 
         #Max SP is 20
