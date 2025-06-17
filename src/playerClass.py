@@ -4,7 +4,7 @@ class Player:
     #Class Attributes
     def __init__(self):
         #Self Stat
-        self.maxHP: int = 3687106 #Dummy value, taken from 3.4 HSR MoC 12 Svarog
+        self.maxHP: int = 100000 #Dummy value, taken from 3.4 HSR MoC 12 Svarog
         self.currHP: int = self.maxHP #Starting HP is equal to max HP
         self.ATK: int = 3000 #Starting ATK at 1000
         self.SP: int = 10 #Starting SP is 10/20

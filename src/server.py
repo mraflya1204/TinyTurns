@@ -38,8 +38,25 @@ game_state = {
 game_started = False
 lock = threading.Lock()
 
-
 # --- Server Functions ---
+
+def shutdown_and_reset_all():
+    """
+    Forcefully closes all client connections and resets the server state.
+    This is the authoritative reset command.
+    """
+    global clients
+    with lock:
+        print("[SERVER] Reset triggered. Closing all client connections.")
+        for conn in clients:
+            try:
+                conn.close()
+            except Exception as e:
+                print(f"[SERVER] Error closing a client connection: {e}")
+        
+        # After closing connections, perform the main reset
+        reset_server()
+
 def handle_client(conn, player_id):
     """
     Handles communication with a single client in a separate thread.
@@ -47,55 +64,68 @@ def handle_client(conn, player_id):
     global game_state, game_started
 
     print(f"[SERVER] Player {player_id} connected.")
-
-    # Send the player their assigned ID
-    conn.send(pickle.dumps(player_id))
+    # Send the player their assigned ID. This might fail if reset happens fast.
+    try:
+        conn.send(pickle.dumps(player_id))
+    except Exception as e:
+        print(f"[SERVER] Failed to send player ID to {player_id}: {e}")
+        # The connection is likely already being closed by a reset.
+        if conn in clients: clients.remove(conn)
+        conn.close()
+        return
 
     while True:
         try:
-            # Wait to receive an action from the client
             data = conn.recv(MAX_BUFFER_SIZE)
             if not data:
-                print(f"[SERVER] Player {player_id} disconnected.")
+                print(f"[SERVER] Player {player_id} disconnected gracefully.")
                 break
 
             action = pickle.loads(data)
             print(f"[SERVER] Received action '{action}' from Player {player_id}")
 
-            # Process the action using a lock to prevent race conditions
+            # NEW: Handle reset request, which can be received at any time.
+            if action == "request_reset":
+                print(f"[SERVER] Player {player_id} initiated a game reset.")
+                shutdown_and_reset_all()
+                # This thread's connection is now closed, so the loop will break.
+                break
+
+            # Process game actions only if the game is not over.
             with lock:
-                process_action(player_id, action)
-
-                # After processing, broadcast the new state to all clients
-                broadcast_gamestate()
-
-                # Check for game over condition
-                if game_state["game_over"]:
-                    print("[SERVER] Game over. Closing connections.")
-                    break
+                if not game_state["game_over"]:
+                    process_action(player_id, action)
+                    broadcast_gamestate()
 
         except (ConnectionResetError, EOFError):
             print(f"[SERVER] Player {player_id} lost connection.")
-            # Handle disconnection during game
-            with lock:
-                game_state["game_over"] = True
-                game_state["message"] = f"Player {player_id} disconnected. Game over."
-                broadcast_gamestate()
             break
         except Exception as e:
             print(f"[SERVER] An error occurred with Player {player_id}: {e}")
             break
 
+    # --- Client disconnection cleanup ---
+    with lock:
+        if conn in clients:
+            clients.remove(conn)
+            print(f"[SERVER] Player {player_id} removed from active clients.")
+        
+        # If a client disconnects mid-game, end the game.
+        if game_started and not game_state["game_over"]:
+            game_state["game_over"] = True
+            game_state["message"] = f"Player {player_id} disconnected. Game over."
+            broadcast_gamestate()
+
+        # If all clients have left, ensure the server is reset for the next game.
+        if not clients and game_started:
+            print("[SERVER] All clients disconnected. Server is resetting.")
+            reset_server()
+
     conn.close()
-    # Basic cleanup
-    if conn in clients:
-        clients.remove(conn)
-    if not clients:
-        print("[SERVER] All clients disconnected. Server is resetting.")
-        reset_server()
 
 
 def process_action(player_id, action):
+    # ... (This function remains unchanged)
     """
     Updates the game state based on the received action.
     This function assumes it's called within a lock.
@@ -103,7 +133,6 @@ def process_action(player_id, action):
     # Determine attacker and defender
     current_player_turn = 1 if game_state["turn"] % 2 != 0 else 2
     if player_id != current_player_turn:
-        # It's not this player's turn. This should ideally not happen.
         return
 
     attacker = game_state["players"][player_id]
@@ -114,75 +143,69 @@ def process_action(player_id, action):
 
     action_message = ""
 
-    # Execute action
     if action == '0':
         action_message = f"{attacker_name} skipped their turn."
-    elif action == '1':  # Basic Attack
+    elif action == '1':
         damage = defender.takeDMG(attacker, 50)
         action_message = f"{attacker_name} used Basic Attack! {defender_name} took {damage:,} damage."
-    elif action == '2':  # Heavy Attack
+    elif action == '2':
         if attacker.SP >= 3:
             attacker.SP -= 3
             damage = defender.takeDMG(attacker, 75)
             action_message = f"{attacker_name} used Heavy Attack! {defender_name} took {damage:,} damage."
         else:
             action_message = "Not enough SP for Heavy Attack! Turn skipped."
-    elif action == '3':  # Debuff
+    elif action == '3':
         if attacker.SP >= 6:
             attacker.SP -= 6
             defender.debuff()
             action_message = f"{attacker_name} debuffed {defender_name}!"
         else:
             action_message = "Not enough SP for Debuff! Turn skipped."
-    elif action == '4':  # CRIT Buff
+    elif action == '4':
         if attacker.SP >= 6:
             attacker.SP -= 6
             attacker.CRITBuff()
             action_message = f"{attacker_name} used CRIT Buff!"
         else:
             action_message = "Not enough SP for CRIT Buff! Turn skipped."
-    elif action == '5':  # Enhancement
+    elif action == '5':
         if attacker.SP >= 6:
             attacker.SP -= 6
             attacker.enchancement()
             action_message = f"{attacker_name} used Enhancement!"
         else:
             action_message = "Not enough SP for Enhancement! Turn skipped."
-
+    
     game_state["message"] = action_message
-
-    # End of turn actions
     attacker.turnEnd()
 
-    # Check for game over
     if defender.currHP <= 0:
         game_state["game_over"] = True
         game_state["message"] = f"{action_message}\n*** {attacker_name} wins! ***"
-    elif attacker.currHP <= 0:  # Should not happen, but for safety
+    elif attacker.currHP <= 0:
         game_state["game_over"] = True
         game_state["message"] = f"{action_message}\n*** {defender_name} wins! ***"
     else:
-        # Move to the next turn
         game_state["turn"] += 1
 
 
 def broadcast_gamestate():
-    """
-    Sends the current game state to all connected clients.
-    """
+    """ Sends the current game state to all connected clients. """
     pickled_state = pickle.dumps(game_state)
-    for client_conn in clients:
+    for client_conn in list(clients): # Use a copy in case the list changes
         try:
             client_conn.sendall(pickled_state)
         except Exception as e:
-            print(f"[SERVER] Failed to send state to a client: {e}")
+            print(f"[SERVER] Failed to send state to a client (might be disconnecting): {e}")
 
 
 def reset_server():
     """Resets the game state for a new game."""
     global game_state, game_started, players, clients
+    print("[SERVER] Resetting game state.")
     players = {}
-    clients = []
+    clients = [] # This is the crucial part for reconnection
     game_state = {
         "players": players,
         "turn": 1,
@@ -190,51 +213,41 @@ def reset_server():
         "message": "Waiting for players..."
     }
     game_started = False
-    print("[SERVER] Server has been reset.")
 
 
 def main():
-    """Main function to run the server."""
+    # ... (This function remains largely unchanged)
     global game_started
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # This allows reusing the address, helpful for quick restarts
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((HOST, PORT))
     server_socket.listen(2)
     print(f"[SERVER] Listening on {HOST}:{PORT}")
 
     while True:
-        # Accept new connections
         conn, addr = server_socket.accept()
-
         with lock:
             if len(clients) < 2:
                 clients.append(conn)
-                player_id = len(clients)  # Assign Player 1 or Player 2
-
+                player_id = len(clients)
                 thread = threading.Thread(target=handle_client, args=(conn, player_id))
-                thread.daemon = True  # Allows main thread to exit even if threads are running
+                thread.daemon = True
                 thread.start()
-
+                
                 if len(clients) == 2 and not game_started:
                     game_started = True
-                    # Initialize players
                     players[1] = Player()
                     players[2] = Player()
                     game_state["message"] = "Game Start! Player 1's Turn."
                     print("[SERVER] Two players connected. Starting the game!")
                     broadcast_gamestate()
             else:
-                print(f"[SERVER] Denied connection from {addr}. Server is full.")
-                # Inform the connecting client that the server is full and close
+                print(f"[SERVER] Denied connection from {addr}. Server is full or resetting.")
                 try:
                     full_message = {"game_over": True, "message": "Server is full. Please try again later."}
                     conn.send(pickle.dumps(full_message))
-                except Exception as e:
-                    print(f"[SERVER] Could not inform full server to {addr}: {e}")
                 finally:
                     conn.close()
-
 
 if __name__ == "__main__":
     main()
