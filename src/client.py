@@ -60,7 +60,7 @@ class InputBox:
         self.text = text
         self.txt_surface = None # Will be created in draw
         self.active = False
-
+    # Event Handling
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             # If the user clicked on the input_box rect.
@@ -260,6 +260,7 @@ def network_handler():
 def connect_to_server(host, port):
     global client_socket, my_player_id, is_connected, network_thread, game_state
     try:
+        # Socket Connection Initialization
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.settimeout(5) # 5 second timeout for connection
         client_socket.connect((host, port))
@@ -278,7 +279,7 @@ def connect_to_server(host, port):
     except Exception as e:
         game_state["message"] = f"Connection failed: {e}"
         return False
-
+# Send user actions to server
 def send_action(action):
     global client_socket, is_connected
     if not is_connected: return
@@ -287,6 +288,7 @@ def send_action(action):
         client_socket.send(pickle.dumps(action))
     except Exception: is_connected = False
 
+# If need to reconnect
 def reset_game_and_reconnect(host, port):
     global is_connected, client_socket, network_thread, game_state, previous_game_state, my_player_id
     is_connected = False
@@ -318,13 +320,16 @@ def update_animations_from_state():
 
 # --- Main Application ---
 def main():
+    # Global variables for UI and gamestate
     global is_my_turn, UI_ELEMENTS, player_sprites, is_connected, game_state
 
+    # pygame initializations
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("TinyTurns Client")
     clock = pygame.time.Clock()
 
+    #Asset loading
     try:
         background_path = os.path.join("assets", "img", "bg_400x300.png")
         #background_path = os.path.join("assets", "img", "blue_sky_800x600.png")
