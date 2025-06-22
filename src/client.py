@@ -22,13 +22,9 @@ import sys
 import threading
 import time
 import pygame
+import copy
 
-# --- Client Configuration ---
-HOST = '127.0.0.1'
-PORT = 65432
-MAX_BUFFER_SIZE = 4096
-
-# --- Pygame UI Configuration ---
+# --- Pygame UI Configuration (can be moved if needed) ---
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 WHITE = (255, 255, 255)
@@ -38,18 +34,63 @@ GREEN = (0, 200, 0)
 BLUE = (0, 0, 200)
 YELLOW = (220, 220, 0)
 GREY = (128, 128, 128)
+POPUP_BG_COLOR = (20, 40, 80)
+POPUP_BORDER_COLOR = (150, 180, 220)
+INPUT_ACTIVE_COLOR = (200, 200, 255)
+INPUT_INACTIVE_COLOR = (100, 100, 150)
+
 
 # --- Global Variables for Client State ---
+MAX_BUFFER_SIZE = 4096
 client_socket = None
 my_player_id = 0
 game_state = {}
-previous_game_state = {} # For comparing states to trigger animations
+previous_game_state = {}
 is_connected = False
 is_my_turn = False
 network_thread = None
 UI_ELEMENTS = {}
-player_sprites = {} # Dictionary to hold our player sprites
+player_sprites = {}
 
+
+class InputBox:
+    def __init__(self, x, y, w, h, text=''):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.color = INPUT_INACTIVE_COLOR
+        self.text = text
+        self.txt_surface = None # Will be created in draw
+        self.active = False
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # If the user clicked on the input_box rect.
+            if self.rect.collidepoint(event.pos):
+                self.active = not self.active
+            else:
+                self.active = False
+            # Change the current color of the input box.
+            self.color = INPUT_ACTIVE_COLOR if self.active else INPUT_INACTIVE_COLOR
+        if event.type == pygame.KEYDOWN:
+            if self.active:
+                if event.key == pygame.K_RETURN:
+                    self.active = False
+                    self.color = INPUT_INACTIVE_COLOR
+                    return "submit" # Special action for submission
+                elif event.key == pygame.K_BACKSPACE:
+                    self.text = self.text[:-1]
+                else:
+                    self.text += event.unicode
+        return None
+
+    def draw(self, screen, font):
+        self.txt_surface = font.render(self.text, True, WHITE)
+        # Blit the text.
+        screen.blit(self.txt_surface, (self.rect.x + 5, self.rect.y + 5))
+        # Blit the rect.
+        pygame.draw.rect(screen, self.color, self.rect, 2)
+        
+# --- Helper functions (fetch_animation_img, drawPlayer, UI helpers) remain the same ---
+# ... (all helper functions from the previous version are assumed to be here) ...
 # --- Helper function to load animation images ---
 def fetch_animation_img(assets_path, total_frame, x_flip, y_flip):
     temp_list = []
@@ -102,12 +143,19 @@ class drawPlayer():
     def draw(self, surface): surface.blit(self.image, self.rect)
 
 # --- UI Element Helper Functions ---
-def draw_text(surface, text, size, x, y, color=WHITE):
-    font = pygame.font.Font(UI_ELEMENTS.get("font"), size)
-    text_surface = font.render(text, True, color)
+def draw_text(surface, text, size, x, y, color=WHITE, font_override=None, align="midtop"):
+    font_to_use = pygame.font.Font(UI_ELEMENTS.get("font") if not font_override else font_override, size)
+    text_surface = font_to_use.render(text, True, color)
     text_rect = text_surface.get_rect()
-    text_rect.midtop = (x, y)
+
+    if align == "midtop":
+        text_rect.midtop = (x, y)
+    elif align == "topleft":
+        text_rect.topleft = (x, y)
+    elif align == "midbottom":
+        text_rect.midbottom = (x,y)
     surface.blit(text_surface, text_rect)
+
 
 def draw_health_bar(surface, x, y, width, height, current_hp, max_hp):
     ratio = current_hp / max_hp if max_hp > 0 else 0
@@ -130,38 +178,63 @@ def draw_player_stats(surface, player, player_name, x_pos):
     draw_sp_bar(surface, x_pos - 100, 120, 200, 20, player.SP)
     draw_text(surface, f"SP: {player.SP} / 20", 18, x_pos, 145)
 
-# --- Button Class (CORRECTED) ---
+# --- Button Class ---
 class Button:
     def __init__(self, x, y, width, height, text, action, cost=0):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
         self.action = action
         self.cost = cost
-        self.is_enabled = False # State is now managed EXTERNALLY
+        self.is_enabled = False 
         self.is_visible = True
 
     def draw(self, surface):
-        """Draws the button but no longer sets its enabled state."""
-        if not self.is_visible:
-            return
-        
-        # Determine color based on the pre-set 'is_enabled' state
+        if not self.is_visible: return
         color = GREY
         if self.is_enabled:
             color = BLUE
             if self.rect.collidepoint(pygame.mouse.get_pos()):
-                color = (0, 100, 200) # Hover color
+                color = (0, 100, 200)
 
         pygame.draw.rect(surface, color, self.rect)
-        draw_text(surface, self.text, 18, self.rect.centerx, self.rect.y + 10)
+        draw_text(surface, self.text, 18, self.rect.centerx, self.rect.y + 5)
         if self.cost > 0:
-            draw_text(surface, f"({self.cost} SP)", 14, self.rect.centerx, self.rect.y + 35)
+            draw_text(surface, f"({self.cost} SP)", 14, self.rect.centerx, self.rect.y + 30)
+
+        elif self.action == '0':
+            pass # No cost text needed
 
     def handle_event(self, event):
         if not self.is_visible or not self.is_enabled: return None
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.rect.collidepoint(event.pos): return self.action
         return None
+
+# --- Popup Function ---
+def draw_info_popup(surface, players, close_button):
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))
+    surface.blit(overlay, (0, 0))
+    panel_rect = pygame.Rect(100, 100, SCREEN_WIDTH - 200, SCREEN_HEIGHT - 250)
+    pygame.draw.rect(surface, POPUP_BG_COLOR, panel_rect)
+    pygame.draw.rect(surface, POPUP_BORDER_COLOR, panel_rect, 3)
+    draw_text(surface, "Player Base Stats", 32, panel_rect.centerx, panel_rect.top + 20)
+    p1 = players.get(1); p2 = players.get(2)
+    y_offset = panel_rect.top + 80
+    if p1:
+        draw_text(surface, "Player 1", 24, panel_rect.centerx - 150, y_offset, YELLOW)
+        draw_text(surface, f"DEF: {p1.DEF:,}", 18, panel_rect.centerx - 150, y_offset + 70)
+        draw_text(surface, f"CRIT Rate: {p1.CRITRate:.0%}", 18, panel_rect.centerx - 150, y_offset + 100)
+        draw_text(surface, f"CRIT DMG: {p1.CRITDMG:.0%}", 18, panel_rect.centerx - 150, y_offset + 130)
+    if p2:
+        draw_text(surface, "Player 2", 24, panel_rect.centerx + 150, y_offset, YELLOW)
+        draw_text(surface, f"DEF: {p2.DEF:,}", 18, panel_rect.centerx + 150, y_offset + 70)
+        draw_text(surface, f"CRIT Rate: {p2.CRITRate:.0%}", 18, panel_rect.centerx + 150, y_offset + 100)
+        draw_text(surface, f"CRIT DMG: {p2.CRITDMG:.0%}", 18, panel_rect.centerx + 150, y_offset + 130)
+
+    close_button.is_visible = True; close_button.is_enabled = True
+    close_button.draw(surface)
+
 
 # --- Networking ---
 def network_handler():
@@ -174,20 +247,31 @@ def network_handler():
             with threading.Lock():
                 previous_game_state = game_state.copy()
                 game_state = new_state
-        except (ConnectionResetError, EOFError, OSError): is_connected = False; break
+        except (ConnectionResetError, EOFError, OSError, pickle.UnpicklingError):
+            is_connected = False; break
         except Exception: is_connected = False; break
 
-def connect_to_server():
-    global client_socket, my_player_id, is_connected, network_thread
+def connect_to_server(host, port):
+    global client_socket, my_player_id, is_connected, network_thread, game_state
     try:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((HOST, PORT))
+        client_socket.settimeout(5) # 5 second timeout for connection
+        client_socket.connect((host, port))
+        client_socket.settimeout(None) # Reset timeout
         my_player_id = pickle.loads(client_socket.recv(MAX_BUFFER_SIZE))
         is_connected = True
-        network_thread = threading.Thread(target=network_handler); network_thread.daemon = True; network_thread.start()
+        network_thread = threading.Thread(target=network_handler, daemon=True)
+        network_thread.start()
         return True
+    except socket.timeout:
+        game_state["message"] = "Connection timed out."
+        return False
+    except (ConnectionRefusedError, OSError) as e:
+        game_state["message"] = f"Connection failed: Server offline?"
+        return False
     except Exception as e:
-        game_state["message"] = f"Connection failed: {e}"; return False
+        game_state["message"] = f"Connection failed: {e}"
+        return False
 
 def send_action(action):
     global client_socket, is_connected
@@ -197,7 +281,7 @@ def send_action(action):
         client_socket.send(pickle.dumps(action))
     except Exception: is_connected = False
 
-def reset_game_and_reconnect():
+def reset_game_and_reconnect(host, port):
     global is_connected, client_socket, network_thread, game_state, previous_game_state, my_player_id
     is_connected = False
     my_player_id = 0
@@ -209,7 +293,8 @@ def reset_game_and_reconnect():
     player_sprites[1].idle(); player_sprites[2].idle()
     for i in range(5):
         print(f"Reconnection attempt {i+1}...")
-        if connect_to_server(): print("Reconnection successful!"); return True
+        if connect_to_server(host, port):
+            print("Reconnection successful!"); return True
         time.sleep(1)
     print("Failed to reconnect."); game_state["message"] = "Could not reconnect."; return False
 
@@ -224,102 +309,211 @@ def update_animations_from_state():
             if curr_p.currHP <= 0 and prev_p.currHP > 0: player_sprites[p_id].dead()
             elif curr_p.currHP < prev_p.currHP: player_sprites[p_id].hurt()
 
-# --- Main Game Loop ---
+
+# --- Main Application ---
 def main():
-    global is_my_turn, UI_ELEMENTS, player_sprites, is_connected
+    global is_my_turn, UI_ELEMENTS, player_sprites, is_connected, game_state
+
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("TinyTurns Client")
     clock = pygame.time.Clock()
 
     try:
-        # Use os.path.join for cross-platform compatibility
-        background_path = os.path.join("assets", "img", "blue_sky_800x600.png")
+        background_path = os.path.join("assets", "img", "bg_400x300.png")
+        #background_path = os.path.join("assets", "img", "blue_sky_800x600.png")
         font_path = os.path.join("assets", "font", "final_fantasy_36_font.ttf")
         background_img = pygame.image.load(background_path).convert()
+        background_img = pygame.transform.scale_by(background_img, 2.0)
         font = font_path
     except pygame.error as e:
         print(f"Error loading assets: {e}")
         background_img = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); background_img.fill(BLACK)
-        font = None
+        font = None # Use pygame default font if custom not found
     UI_ELEMENTS = {"background": background_img, "font": font}
-
-    player_sprites[1] = drawPlayer(x=SCREEN_WIDTH * 0.25, y=280, x_flip=False, y_flip=False)
-    player_sprites[2] = drawPlayer(x=SCREEN_WIDTH * 0.75, y=280, x_flip=True, y_flip=False)
     
-    buttons = [
-        Button(100, 520, 140, 60, "Basic Attack", '1', cost=0),
-        Button(250, 520, 140, 60, "Heavy Attack", '2', cost=3),
-        Button(400, 520, 140, 60, "Debuff", '3', cost=6),
-        Button(175, 450, 140, 60, "CRIT Buff", '4', cost=6),
-        Button(325, 450, 140, 60, "Enhance", '5', cost=6),
-    ]
-    play_again_button = Button(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 + 50, 200, 60, "Play Again", "request_reset")
+    button_panel_width = 200
+    button_panel = pygame.Surface((button_panel_width, SCREEN_HEIGHT), pygame.SRCALPHA)
+    button_panel.fill((20, 20, 40, 180)) # Dark blue with some transparency
 
-    if not connect_to_server():
-        screen.blit(UI_ELEMENTS["background"], (0, 0))
-        draw_text(screen, game_state.get("message", "Error"), 24, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
-        pygame.display.flip(); time.sleep(3)
-        pygame.quit(); sys.exit()
+    # Use a system font for input boxes as a fallback
+    input_font = pygame.font.Font(None, 32)
+
+    current_scene = "settings_menu"
+    server_host = '127.0.0.1'
+    server_port_str = '65432'
+    
+    # Settings Menu UI
+    host_input = InputBox(SCREEN_WIDTH/2 - 150, 200, 300, 40, server_host)
+    port_input = InputBox(SCREEN_WIDTH/2 - 150, 300, 300, 40, server_port_str)
+    input_boxes = [host_input, port_input]
+    connect_button = Button(SCREEN_WIDTH/2 - 100, 400, 200, 50, "Connect", "connect")
+    error_back_button = Button(SCREEN_WIDTH/2 - 100, 400, 200, 50, "Back to Menu", "back_to_menu")
+
+
+    # Game Scene UI (initialized here but used in 'game' scene)
+    player_sprites[1] = drawPlayer(x=(SCREEN_WIDTH - button_panel_width) * 0.3, y=SCREEN_HEIGHT-100, x_flip=False, y_flip=False)
+    player_sprites[2] = drawPlayer(x=(SCREEN_WIDTH - button_panel_width) * 0.7, y=SCREEN_HEIGHT-100, x_flip=True, y_flip=False)
+    
+    buttons = []
+    button_x = SCREEN_WIDTH - button_panel_width + 30
+    button_y_start = 180
+    button_spacing = 65
+    button_width = 140
+    button_height = 55
+
+    button_definitions = [
+        {"text": "Basic Attack", "action": '1', "cost": 0},
+        {"text": "Heavy Attack", "action": '2', "cost": 3},
+        {"text": "Debuff",       "action": '3', "cost": 6},
+        {"text": "CRIT Buff",    "action": '4', "cost": 6},
+        {"text": "Enhance",      "action": '5', "cost": 6},
+        {"text": "Skip Turn",    "action": '0', "cost": 0}
+    ]
+
+    for i, b_def in enumerate(button_definitions):
+        y_pos = button_y_start + (i * button_spacing)
+        buttons.append(Button(button_x, y_pos, button_width, button_height, b_def["text"], b_def["action"], b_def["cost"]))
+
+
+    play_again_button = Button(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 + 50, 200, 60, "Play Again", "request_reset")
+    info_button = Button(10, 10, 70, 40, "Stats", "show_info")
+    popup_close_button = Button(SCREEN_WIDTH - 200 - 10, 100 + 10, 100, 40, "Close", "close_popup")
+    show_info_popup = False
+
 
     running = True
     while running:
-        if not is_connected:
-            if not reset_game_and_reconnect():
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
                 running = False
-        
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT: running = False
+
+        # --- Scene: Settings Menu ---
+        if current_scene == "settings_menu":
+            screen.blit(UI_ELEMENTS["background"], (0, 0))
+            draw_text(screen, "Server Settings", 48, SCREEN_WIDTH/2, 100)
+            draw_text(screen, "Host IP:", 24, SCREEN_WIDTH/2, 170)
+            draw_text(screen, "Port:", 24, SCREEN_WIDTH/2, 270)
             
-            if game_state.get("game_over", False):
-                action = play_again_button.handle_event(event)
-                if action == "request_reset":
-                    send_action("request_reset")
-                    time.sleep(0.2)
-                    if not reset_game_and_reconnect(): running = False
+            for box in input_boxes:
+                # A bit of a hack to handle events for multiple boxes.
+                # A more robust system would iterate all events for all boxes.
+                box.handle_event(pygame.event.Event(pygame.USEREVENT) if not events else events[0])
+                box.draw(screen, input_font)
+
+            connect_button.is_enabled = True
+            connect_button.draw(screen)
+
+            for event in events:
+                action = connect_button.handle_event(event)
+                if action == "connect":
+                    server_host = host_input.text
+                    server_port_str = port_input.text
+                    current_scene = "connecting"
+        
+        # --- Scene: Connecting ---
+        elif current_scene == "connecting":
+            screen.blit(UI_ELEMENTS["background"], (0, 0))
+            draw_text(screen, f"Connecting to {server_host}:{server_port_str}...", 32, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
+            pygame.display.flip()
+
+            try:
+                port = int(server_port_str)
+                if connect_to_server(server_host, port):
+                    current_scene = "game"
+                else:
+                    current_scene = "error"
+            except ValueError:
+                game_state["message"] = "Invalid Port. Must be a number."
+                current_scene = "error"
+        
+        # --- Scene: Connection Error ---
+        elif current_scene == "error":
+            screen.blit(UI_ELEMENTS["background"], (0, 0))
+            draw_text(screen, "Connection Failed", 48, SCREEN_WIDTH/2, 200, RED)
+            draw_text(screen, game_state.get("message", "An unknown error occurred."), 24, SCREEN_WIDTH/2, 280)
+            
+            error_back_button.is_enabled = True
+            error_back_button.draw(screen)
+            for event in events:
+                action = error_back_button.handle_event(event)
+                if action == "back_to_menu":
+                    current_scene = "settings_menu"
+
+        # --- Scene: Game ---
+        elif current_scene == "game":
+            if not is_connected:
+                if not reset_game_and_reconnect(server_host, int(server_port_str)):
+                    current_scene = "error" # Failed to reconnect
+                    
+            for event in events:
+                if show_info_popup:
+                    action = popup_close_button.handle_event(event)
+                    if action == "close_popup": show_info_popup = False
+                else:
+                    action = info_button.handle_event(event)
+                    if action == "show_info": show_info_popup = True; continue
+
+                    if game_state.get("game_over", False):
+                        action = play_again_button.handle_event(event)
+                        if action == "request_reset":
+                            send_action("request_reset")
+                            time.sleep(0.2)
+                            if not reset_game_and_reconnect(server_host, int(server_port_str)):
+                                current_scene = "error"
+                    else:
+                        for button in buttons:
+                            action = button.handle_event(event)
+                            if action: send_action(action); is_my_turn = False; break
+
+            # Drawing and game logic for the 'game' scene
+            current_turn = game_state.get("turn", 1)
+            current_player_turn = 1 if current_turn % 2 != 0 else 2
+            is_my_turn = (my_player_id == current_player_turn) and (not game_state.get("game_over", False)) and is_connected
+
+            update_animations_from_state()
+            player_sprites[1].update(); player_sprites[2].update()
+
+            screen.blit(UI_ELEMENTS["background"], (0, 0))
+            player_sprites[1].draw(screen); player_sprites[2].draw(screen)
+            
+            screen.blit(button_panel, (SCREEN_WIDTH - button_panel_width, 0))
+
+
+            players = game_state.get("players", {})
+            draw_player_stats(screen, players.get(1), "Player 1", (SCREEN_WIDTH-button_panel_width) * 0.25)
+            draw_player_stats(screen, players.get(2), "Player 2", (SCREEN_WIDTH-button_panel_width) * 0.75)
+            
+            info_button.is_enabled = True
+            info_button.draw(screen)
+
+
+            if show_info_popup:
+                draw_info_popup(screen, players, popup_close_button)
             else:
-                for button in buttons:
-                    action = button.handle_event(event)
-                    if action: send_action(action); is_my_turn = False; break
+                draw_text(screen, game_state.get("message", "Waiting..."), 22, (SCREEN_WIDTH - button_panel_width)/2, 300, YELLOW, align="midtop")
+                status_text = ""
+                if is_connected and not game_state.get("game_over", False):
+                    if is_my_turn: status_text = "Your Turn!"
+                    else: status_text = f"Waiting for Player {current_player_turn}..."
+                
+                draw_text(screen, status_text, 28, (SCREEN_WIDTH - button_panel_width)/2, 275, WHITE, align="midtop")
 
-        current_turn = game_state.get("turn", 1)
-        current_player_turn = 1 if current_turn % 2 != 0 else 2
-        is_my_turn = (my_player_id == current_player_turn) and (not game_state.get("game_over", False)) and is_connected
-
-        update_animations_from_state()
-        player_sprites[1].update(); player_sprites[2].update()
-
-        screen.blit(UI_ELEMENTS["background"], (0, 0))
-        player_sprites[1].draw(screen); player_sprites[2].draw(screen)
-
-        players = game_state.get("players", {})
-        draw_player_stats(screen, players.get(1), "Player 1", SCREEN_WIDTH * 0.25)
-        draw_player_stats(screen, players.get(2), "Player 2", SCREEN_WIDTH * 0.75)
-        draw_text(screen, game_state.get("message", "Waiting..."), 22, SCREEN_WIDTH / 2, 380, YELLOW)
-        
-        status_text = ""
-        if is_connected and not game_state.get("game_over", False):
-            if is_my_turn: status_text = "Your Turn!"
-            else: status_text = f"Waiting for Player {current_player_turn}..."
-        draw_text(screen, status_text, 28, SCREEN_WIDTH / 2, 420)
-        
-        my_sp = players.get(my_player_id).SP if my_player_id in players else 0
-        
-        # --- CORRECTED BUTTON STATE MANAGEMENT ---
-        if is_connected and not game_state.get("game_over", False):
-            play_again_button.is_visible = False
-            for button in buttons:
-                button.is_visible = True
-                # Set enabled state here, before drawing
-                button.is_enabled = is_my_turn and (my_sp >= button.cost)
-                button.draw(screen)
-        else:
-            for button in buttons:
-                button.is_visible = False
-            play_again_button.is_visible = True
-            # Explicitly enable the button, this will now work correctly
-            play_again_button.is_enabled = True
-            play_again_button.draw(screen)
+                my_sp = players.get(my_player_id).SP if my_player_id in players else 0
+                
+                if is_connected and not game_state.get("game_over", False):
+                    play_again_button.is_visible = False
+                    for button in buttons:
+                        button.is_visible = True
+                        button.is_enabled = is_my_turn and (my_sp >= button.cost)
+                        button.draw(screen)
+                else:
+                    for button in buttons: button.is_visible = False
+                    play_again_button.rect.centerx = (SCREEN_WIDTH-button_panel_width) // 2
+                    play_again_button.is_visible = True
+                    play_again_button.is_enabled = True
+                    play_again_button.draw(screen)
 
         pygame.display.flip()
         clock.tick(60)
@@ -331,7 +525,7 @@ def main():
         except OSError: pass
     if network_thread and network_thread.is_alive(): network_thread.join()
     pygame.quit()
-    sys.exit()
+    os._exit(0)
 
 if __name__ == "__main__":
     main()
