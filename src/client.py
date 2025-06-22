@@ -223,14 +223,20 @@ def draw_info_popup(surface, players, close_button):
     y_offset = panel_rect.top + 80
     if p1:
         draw_text(surface, "Player 1", 24, panel_rect.centerx - 150, y_offset, YELLOW)
-        draw_text(surface, f"DEF: {p1.DEF:,}", 18, panel_rect.centerx - 150, y_offset + 70)
-        draw_text(surface, f"CRIT Rate: {p1.CRITRate:.0%}", 18, panel_rect.centerx - 150, y_offset + 100)
-        draw_text(surface, f"CRIT DMG: {p1.CRITDMG:.0%}", 18, panel_rect.centerx - 150, y_offset + 130)
+        draw_text(surface, f"ATK: {p1.ATK:,}", 18, panel_rect.centerx - 150, y_offset + 70)
+        draw_text(surface, f"DEF: {p1.DEF:,}", 18, panel_rect.centerx - 150, y_offset + 100)
+        draw_text(surface, f"CRIT Rate: {p1.CRITRate:.0%}", 18, panel_rect.centerx - 150, y_offset + 130)
+        draw_text(surface, f"CRIT DMG: {p1.CRITDMG:.0%}", 18, panel_rect.centerx - 150, y_offset + 160)
+        draw_text(surface, f"DMG%: {p1.DMGDealt:.0%}", 18, panel_rect.centerx - 150, y_offset + 190)
+        draw_text(surface, f"Vulnerability: {p1.vulnerability:.0%}", 18, panel_rect.centerx - 150, y_offset + 220)
     if p2:
         draw_text(surface, "Player 2", 24, panel_rect.centerx + 150, y_offset, YELLOW)
-        draw_text(surface, f"DEF: {p2.DEF:,}", 18, panel_rect.centerx + 150, y_offset + 70)
-        draw_text(surface, f"CRIT Rate: {p2.CRITRate:.0%}", 18, panel_rect.centerx + 150, y_offset + 100)
-        draw_text(surface, f"CRIT DMG: {p2.CRITDMG:.0%}", 18, panel_rect.centerx + 150, y_offset + 130)
+        draw_text(surface, f"ATK: {p2.ATK:,}", 18, panel_rect.centerx + 150, y_offset + 70)
+        draw_text(surface, f"DEF: {p2.DEF:,}", 18, panel_rect.centerx + 150, y_offset + 100)
+        draw_text(surface, f"CRIT Rate: {p2.CRITRate:.0%}", 18, panel_rect.centerx + 150, y_offset + 130)
+        draw_text(surface, f"CRIT DMG: {p2.CRITDMG:.0%}", 18, panel_rect.centerx + 150, y_offset + 160)
+        draw_text(surface, f"DMG%: {p2.DMGDealt:.0%}", 18, panel_rect.centerx + 150, y_offset + 190)
+        draw_text(surface, f"Vulnerability: {p2.vulnerability:.0%}", 18, panel_rect.centerx +    150, y_offset + 220)
 
     close_button.is_visible = True; close_button.is_enabled = True
     close_button.draw(surface)
