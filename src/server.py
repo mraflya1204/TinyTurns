@@ -146,13 +146,14 @@ def process_action(player_id, action):
     if action == '0':
         action_message = f"{attacker_name} skipped their turn."
     elif action == '1':
-        damage = defender.takeDMG(attacker, 50)
+        damage = defender.takeDMG(attacker, 5.0)
         action_message = f"{attacker_name} used Basic Attack! {defender_name} took {damage:,} damage."
     elif action == '2':
         if attacker.SP >= 3:
             attacker.SP -= 3
-            damage = defender.takeDMG(attacker, 75)
+            damage = defender.takeDMG(attacker, 7.5 * attacker.HeavyMod)
             action_message = f"{attacker_name} used Heavy Attack! {defender_name} took {damage:,} damage."
+            attacker.HeavyMod *= 1.25
         else:
             action_message = "Not enough SP for Heavy Attack! Turn skipped."
     elif action == '3':
