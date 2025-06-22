@@ -76,6 +76,7 @@ def handle_client(conn, player_id):
 
     while True:
         try:
+            # Receive Data
             data = conn.recv(MAX_BUFFER_SIZE)
             if not data:
                 print(f"[SERVER] Player {player_id} disconnected gracefully.")
@@ -97,15 +98,18 @@ def handle_client(conn, player_id):
                     process_action(player_id, action)
                     broadcast_gamestate()
 
+        #Exception for Connection Reset
         except (ConnectionResetError, EOFError):
             print(f"[SERVER] Player {player_id} lost connection.")
             break
+        #Other Exceptions
         except Exception as e:
             print(f"[SERVER] An error occurred with Player {player_id}: {e}")
             break
 
     # --- Client disconnection cleanup ---
     with lock:
+        #If Client is connected
         if conn in clients:
             clients.remove(conn)
             print(f"[SERVER] Player {player_id} removed from active clients.")
@@ -120,7 +124,7 @@ def handle_client(conn, player_id):
         if not clients and game_started:
             print("[SERVER] All clients disconnected. Server is resetting.")
             reset_server()
-
+    #Close connection
     conn.close()
 
 
@@ -135,6 +139,7 @@ def process_action(player_id, action):
     if player_id != current_player_turn:
         return
 
+    # Assignment
     attacker = game_state["players"][player_id]
     defender_id = 2 if player_id == 1 else 1
     defender = game_state["players"][defender_id]
@@ -143,19 +148,24 @@ def process_action(player_id, action):
 
     action_message = ""
 
+    # Skip Turn
     if action == '0':
         action_message = f"{attacker_name} skipped their turn."
+    # Basic ATK
     elif action == '1':
         damage = defender.takeDMG(attacker, 5.0)
         action_message = f"{attacker_name} used Basic Attack! {defender_name} took {damage:,} damage."
+    # Heavy ATK
     elif action == '2':
         if attacker.SP >= 3:
             attacker.SP -= 3
             damage = defender.takeDMG(attacker, 7.5 * attacker.HeavyMod)
             action_message = f"{attacker_name} used Heavy Attack! {defender_name} took {damage:,} damage."
+            #Increase Heavy ATK Base DMG
             attacker.HeavyMod *= 1.25
         else:
             action_message = "Not enough SP for Heavy Attack! Turn skipped."
+    # Debuff Enemy
     elif action == '3':
         if attacker.SP >= 6:
             attacker.SP -= 6
@@ -163,6 +173,7 @@ def process_action(player_id, action):
             action_message = f"{attacker_name} debuffed {defender_name}!"
         else:
             action_message = "Not enough SP for Debuff! Turn skipped."
+    # Self CRIT Buff
     elif action == '4':
         if attacker.SP >= 6:
             attacker.SP -= 6
@@ -170,6 +181,7 @@ def process_action(player_id, action):
             action_message = f"{attacker_name} used CRIT Buff!"
         else:
             action_message = "Not enough SP for CRIT Buff! Turn skipped."
+    # Self Enhancement
     elif action == '5':
         if attacker.SP >= 6:
             attacker.SP -= 6
@@ -181,6 +193,7 @@ def process_action(player_id, action):
     game_state["message"] = action_message
     attacker.turnEnd()
 
+    #Ending Gamestate Validation
     if defender.currHP <= 0:
         game_state["game_over"] = True
         game_state["message"] = f"{action_message}\n*** {attacker_name} wins! ***"
@@ -217,7 +230,8 @@ def reset_server():
 
 
 def main():
-    # ... (This function remains largely unchanged)
+    # ... (This function remains largely unchanged) <- is this AI comment lol
+    # Server Initialization
     global game_started
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -225,7 +239,9 @@ def main():
     server_socket.listen(2)
     print(f"[SERVER] Listening on {HOST}:{PORT}")
 
+    # Game Loop
     while True:
+        # Accept Connection
         conn, addr = server_socket.accept()
         with lock:
             if len(clients) < 2:
