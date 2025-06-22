@@ -196,10 +196,10 @@ def process_action(player_id, action):
     #Ending Gamestate Validation
     if defender.currHP <= 0:
         game_state["game_over"] = True
-        game_state["message"] = f"{action_message}\n*** {attacker_name} wins! ***"
+        game_state["message"] = f"{action_message} {attacker_name} wins!"
     elif attacker.currHP <= 0:
         game_state["game_over"] = True
-        game_state["message"] = f"{action_message}\n*** {defender_name} wins! ***"
+        game_state["message"] = f"{action_message} {defender_name} wins!"
     else:
         game_state["turn"] += 1
 

@@ -52,7 +52,6 @@ network_thread = None
 UI_ELEMENTS = {}
 player_sprites = {}
 
-
 class InputBox:
     def __init__(self, x, y, w, h, text=''):
         self.rect = pygame.Rect(x, y, w, h)
@@ -392,6 +391,8 @@ def main():
     popup_close_button = Button(SCREEN_WIDTH - 200 - 10, 100 + 10, 100, 40, "Close", "close_popup")
     show_info_popup = False
 
+    #--- BG Music state, only plays during the gameplay ---
+    music_playing = False
 
     running = True
     while running:
@@ -441,6 +442,10 @@ def main():
         
         # --- Scene: Connection Error ---
         elif current_scene == "error":
+            if music_playing:
+                pygame.mixer.music.stop()
+                music_playing = False
+            
             screen.blit(UI_ELEMENTS["background"], (0, 0))
             draw_text(screen, "Connection Failed", 48, SCREEN_WIDTH/2, 200, RED)
             draw_text(screen, game_state.get("message", "An unknown error occurred."), 24, SCREEN_WIDTH/2, 280)
@@ -454,6 +459,24 @@ def main():
 
         # --- Scene: Game ---
         elif current_scene == "game":
+            
+            # -- Background music initialization
+            if not music_playing and not game_state.get("game_over", False):
+                try:
+                    pygame.mixer.init(frequency=16000)
+                    bg_music_path = os.path.join("assets", "music", "fight_theme.mp3")
+                    pygame.mixer.music.load(bg_music_path)
+                    pygame.mixer.music.play(-1)
+                    music_playing = True
+                except pygame.error as e:
+                    print(f"Could not load or play music: {e}")
+                    music_playing = True
+                    
+            if game_state.get("game_over", False) and music_playing:
+                    bg_music_path = os.path.join("assets", "music", "fight_theme.mp3")
+                    pygame.mixer.music.load(bg_music_path)
+                    pygame.mixer.music.play(-1)
+            
             if not is_connected:
                 if not reset_game_and_reconnect(server_host, int(server_port_str)):
                     current_scene = "error" # Failed to reconnect
