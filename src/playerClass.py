@@ -18,6 +18,9 @@ class Player:
         #Debuff
         self.vulnerability: float = 0.0 #0% Starting Vulnerability Multiplier
 
+        #Heavy ATK Modifier
+        self.HeavyMod: float = 1.0 #100% Starting base. Increase 25% per Heavy usage (exponential)
+
     #Called by the receiving attack's player, honestly doesn't matter since we have both player in parameter anyways
     def takeDMG(self, attacker, baseMultiplier):
         #CRIT Check
@@ -69,6 +72,7 @@ class Player:
         self.DMGDealt += 0.5
         self.ATK += 0.9 * self.ATK
 
+    #Call for Debuff command
     def debuff(self):
         self.vulnerability += 0.5
         self.DEF -= 0.5 * 1100
