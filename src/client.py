@@ -443,10 +443,10 @@ def main():
 
     button_definitions = [
         {"text": "Basic Attack", "action": '1', "cost": 0},
-        {"text": "Heavy Attack", "action": '2', "cost": 3},
-        {"text": "Debuff",       "action": '3', "cost": 6},
-        {"text": "CRIT Buff",    "action": '4', "cost": 6},
-        {"text": "Enhance",      "action": '5', "cost": 6},
+        {"text": "Heavy Attack", "action": '2', "cost": 0},
+        {"text": "Debuff",       "action": '3', "cost": 3},
+        {"text": "CRIT Buff",    "action": '4', "cost": 3},
+        {"text": "Enhance",      "action": '5', "cost": 3},
         {"text": "Skip Turn",    "action": '0', "cost": 0}
     ]
 
