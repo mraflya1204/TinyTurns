@@ -2,7 +2,8 @@
 Final Project for EF234401-Pemrograman Jaringan
 
 # Requirements
-python, pygame
+- python
+- pygame
 
 # Running
 Use `run.bat` to run the necessary files.
