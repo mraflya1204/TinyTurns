@@ -51,6 +51,14 @@ is_my_turn = False
 network_thread = None
 UI_ELEMENTS = {}
 player_sprites = {}
+SOUND_EFFECTS = {} # NEW: Dictionary for sound effects
+game_over_sound_played = False # NEW: Flag for game over music
+
+ASSET_PATHS = {
+    "victory_music": os.path.join("assets", "music", "victory_theme.mp3"),
+    "defeat_music": os.path.join("assets", "music", "defeat_theme.mp3"),
+    "sfx_dir": os.path.join("assets", "sfx")
+}
 
 class InputBox:
     def __init__(self, x, y, w, h, text=''):
@@ -283,44 +291,101 @@ def send_action(action):
     global client_socket, is_connected
     if not is_connected: return
     try:
-        if action in ['1', '2']: player_sprites[my_player_id].attack()
+        if action == '1' and SOUND_EFFECTS.get('attack'): 
+            SOUND_EFFECTS['attack'].play()
+        elif action == '2' and SOUND_EFFECTS.get('heavy_attack'): 
+            SOUND_EFFECTS['heavy_attack'].play()
+        elif action == '3' and SOUND_EFFECTS.get('debuff'): 
+            SOUND_EFFECTS['debuff'].play()
+        elif action in ['4', '5'] and SOUND_EFFECTS.get('buff'): 
+            SOUND_EFFECTS['buff'].play()
+        elif action == '0' and SOUND_EFFECTS.get('skip'): 
+            SOUND_EFFECTS['skip'].play()
+        
+        if action in ['1', '2']: 
+            player_sprites[my_player_id].attack()
         client_socket.send(pickle.dumps(action))
-    except Exception: is_connected = False
+    
+    except Exception: 
+        is_connected = False
 
 # If need to reconnect
 def reset_game_and_reconnect(host, port):
-    global is_connected, client_socket, network_thread, game_state, previous_game_state, my_player_id
+    global is_connected, client_socket, network_thread, game_state, previous_game_state, my_player_id, game_over_sound_played
     is_connected = False
     my_player_id = 0
-    if client_socket: client_socket.close()
-    if network_thread and network_thread.is_alive(): network_thread.join(timeout=1)
-    client_socket = None; network_thread = None
+    game_over_sound_played = True
+    
+    if client_socket: 
+        client_socket.close()
+        
+    if network_thread and network_thread.is_alive(): 
+        network_thread.join(timeout=1)
+        
+    client_socket = None
+    network_thread = None
+    
     game_state = {"message": "Reconnecting to server..."}
     previous_game_state = {}
-    player_sprites[1].idle(); player_sprites[2].idle()
+    
+    player_sprites[1].idle()
+    player_sprites[2].idle()
+    
     for i in range(5):
         print(f"Reconnection attempt {i+1}...")
+        
         if connect_to_server(host, port):
-            print("Reconnection successful!"); return True
+            print("Reconnection successful!")
+            return True
+        
         time.sleep(1)
-    print("Failed to reconnect."); game_state["message"] = "Could not reconnect."; return False
+        
+    print("Failed to reconnect.")
+    game_state["message"] = "Could not reconnect."
+    return False
 
 # --- Animation Control from Game State ---
 def update_animations_from_state():
-    if not previous_game_state or not game_state: return
-    curr_players = game_state.get("players", {}); prev_players = previous_game_state.get("players", {})
-    if not curr_players or not prev_players: return
+    if not previous_game_state or not game_state: 
+        return
+    
+    curr_players = game_state.get("players", {})
+    prev_players = previous_game_state.get("players", {})
+    
+    if not curr_players or not prev_players:
+        return
+    
     for p_id in [1, 2]:
         if p_id in curr_players and p_id in prev_players:
-            curr_p = curr_players[p_id]; prev_p = prev_players[p_id]
-            if curr_p.currHP <= 0 and prev_p.currHP > 0: player_sprites[p_id].dead()
-            elif curr_p.currHP < prev_p.currHP: player_sprites[p_id].hurt()
+            curr_p = curr_players[p_id]
+            prev_p = prev_players[p_id]
+            
+            if curr_p.currHP <= 0 and prev_p.currHP > 0: 
+                player_sprites[p_id].dead()
+                
+            elif curr_p.currHP < prev_p.currHP: 
+                player_sprites[p_id].hurt()
+
+def load_sound_effects():
+    sfx_to_load = {
+        'attack': 'attack.mp3', 
+        'heavy_attack': 'attack.mp3',
+        'buff': 'good.mp3', 
+        'debuff': 'good.mp3',
+        'skip': 'good.mp3', 
+    }
+    for name, filename in sfx_to_load.items():
+        try:
+            path = os.path.join(ASSET_PATHS["sfx_dir"], filename)
+            SOUND_EFFECTS[name] = pygame.mixer.Sound(path)
+        except pygame.error as e:
+            print(f"Warning: Could not load sound '{filename}': {e}")
 
 
 # --- Main Application ---
 def main():
     # Global variables for UI and gamestate
-    global is_my_turn, UI_ELEMENTS, player_sprites, is_connected, game_state
+    global is_my_turn, UI_ELEMENTS, player_sprites, is_connected, game_state, game_over_sound_played
 
     # pygame initializations
     pygame.init()
@@ -328,6 +393,8 @@ def main():
     pygame.display.set_caption("TinyTurns Client")
     clock = pygame.time.Clock()
 
+    load_sound_effects()
+    
     #Asset loading
     try:
         background_path = os.path.join("assets", "img", "bg_400x300.png")
@@ -338,13 +405,15 @@ def main():
         font = font_path
     except pygame.error as e:
         print(f"Error loading assets: {e}")
-        background_img = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); background_img.fill(BLACK)
+        background_img = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        background_img.fill(BLACK)
+        
         font = None # Use pygame default font if custom not found
     UI_ELEMENTS = {"background": background_img, "font": font}
     
     button_panel_width = 200
     button_panel = pygame.Surface((button_panel_width, SCREEN_HEIGHT), pygame.SRCALPHA)
-    button_panel.fill((20, 20, 40, 180)) # Dark blue with some transparency
+    button_panel.fill((20, 20, 40, 180))
 
     # Use a system font for input boxes as a fallback
     input_font = pygame.font.Font(None, 32)
@@ -409,8 +478,6 @@ def main():
             draw_text(screen, "Port:", 24, SCREEN_WIDTH/2, 270)
             
             for box in input_boxes:
-                # A bit of a hack to handle events for multiple boxes.
-                # A more robust system would iterate all events for all boxes.
                 box.handle_event(pygame.event.Event(pygame.USEREVENT) if not events else events[0])
                 box.draw(screen, input_font)
 
@@ -454,14 +521,16 @@ def main():
             error_back_button.draw(screen)
             for event in events:
                 action = error_back_button.handle_event(event)
+                
                 if action == "back_to_menu":
                     current_scene = "settings_menu"
 
         # --- Scene: Game ---
         elif current_scene == "game":
+            is_game_over = game_state.get("game_over", False)
             
             # -- Background music initialization
-            if not music_playing and not game_state.get("game_over", False):
+            if not music_playing and not is_game_over:
                 try:
                     pygame.mixer.init(frequency=16000)
                     bg_music_path = os.path.join("assets", "music", "fight_theme.mp3")
@@ -475,6 +544,7 @@ def main():
             if game_state.get("game_over", False) and music_playing:
                     bg_music_path = os.path.join("assets", "music", "fight_theme.mp3")
                     pygame.mixer.music.load(bg_music_path)
+                    music_path = ASSET_PATHS['victory_music']
                     pygame.mixer.music.play(-1)
             
             if not is_connected:
@@ -499,7 +569,10 @@ def main():
                     else:
                         for button in buttons:
                             action = button.handle_event(event)
-                            if action: send_action(action); is_my_turn = False; break
+                            if action:
+                                send_action(action)
+                                is_my_turn = False
+                                break
 
             # Drawing and game logic for the 'game' scene
             current_turn = game_state.get("turn", 1)
